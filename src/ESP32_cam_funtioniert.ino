@@ -8,8 +8,8 @@
 #include <Preferences.h>
 
 // ====== Wi-Fi ======
-const char* WIFI_SSID = "o2wlan";
-const char* WIFI_PASS = "0218969095de--";
+const char* WIFI_SSID = "xxxx";
+const char* WIFI_PASS = "xxxxx";
 
 AsyncWebServer server(80);
 
