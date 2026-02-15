@@ -210,7 +210,10 @@ R"(<!DOCTYPE html>
 	</head>
 	<body onload="dReq() ">
 		<canvas id="myCanvas" style="border:2px solid #000000; border-radius: 10px; box-shadow: 0 0 0 1px rgba(120,120,120,.2), 0 2px 10px rgba(0,0,0,.2);"></canvas>
-		<h1><a href="calibrate.html">Calibrate</a></h1>
+		<h1>
+			<a href="calibrate.html">Calibrate</a> | 
+			<a href="settings.html">Settings</a>
+		</h1>
 	</body>
 </html>)";
 
@@ -261,31 +264,22 @@ container.addEventListener('click', e => {
 	const x = (e.clientX - rect.left) / rect.width;
 	const y = (e.clientY - rect.top) / rect.height;
 
-	points.push({x, y});
-	drawDot(e.clientX - rect.left, e.clientY - rect.top);
+	points.push({ x, y });
+
+	const dot = document.createElement('div');
+	dot.className = 'dot';
+	dot.style.left = (x * 100) + '%';
+	dot.style.top = (y * 100) + '%';
+	container.appendChild(dot);
 
 	if (points.length === 4) {
 		sendPoints(points);
-		img.style.borderColor = "green";
-	}
-	if (points.length > 4) {
-		clearPoints();
-		reloadPhoto();
+		setTimeout(() => {
+			points = [];
+			Array.from(container.querySelectorAll('.dot')).forEach(d => d.remove());
+		}, 1000);
 	}
 });
-
-function drawDot(x, y) {
-	const dot = document.createElement('div');
-	dot.className = 'dot';
-	dot.style.left = x + 'px';
-	dot.style.top = y + 'px';
-	container.appendChild(dot);
-}
-
-function clearPoints() {
-	points = [];
-	document.querySelectorAll('.dot').forEach(d => d.remove());
-}
 
 function sendPoints(points) {
 	fetch('/points', {
@@ -297,6 +291,281 @@ function sendPoints(points) {
 </script>
 </body>
 </html>)";
+
+// ===================
+const String settings_html =
+R"RAW_DELIM(<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Detection Settings</title>
+<style>
+	body {
+		font-family: Arial, sans-serif;
+		max-width: 600px;
+		margin: 40px auto;
+		padding: 20px;
+		background: #f5f5f5;
+	}
+	.setting {
+		background: white;
+		padding: 20px;
+		margin: 15px 0;
+		border-radius: 8px;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	}
+	.setting label {
+		display: block;
+		font-weight: bold;
+		margin-bottom: 10px;
+		color: #333;
+	}
+	.setting .description {
+		font-size: 13px;
+		color: #666;
+		margin-bottom: 10px;
+	}
+	.slider-container {
+		display: flex;
+		align-items: center;
+		gap: 15px;
+	}
+	input[type="range"] {
+		flex: 1;
+		height: 8px;
+		border-radius: 4px;
+		background: #ddd;
+		outline: none;
+	}
+	input[type="range"]::-webkit-slider-thumb {
+		appearance: none;
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		background: #4CAF50;
+		cursor: pointer;
+	}
+	.value-display {
+		min-width: 50px;
+		text-align: center;
+		font-weight: bold;
+		font-size: 18px;
+		color: #4CAF50;
+	}
+	.buttons {
+		display: flex;
+		gap: 10px;
+		margin-top: 30px;
+	}
+	button {
+		flex: 1;
+		padding: 15px;
+		font-size: 16px;
+		font-weight: bold;
+		border: none;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.3s;
+	}
+	.btn-save {
+		background: #4CAF50;
+		color: white;
+	}
+	.btn-save:hover {
+		background: #45a049;
+	}
+	.btn-reset {
+		background: #ff9800;
+		color: white;
+	}
+	.btn-reset:hover {
+		background: #e68900;
+	}
+	.btn-back {
+		background: #2196F3;
+		color: white;
+	}
+	.btn-back:hover {
+		background: #0b7dda;
+	}
+	.status {
+		text-align: center;
+		padding: 10px;
+		margin-top: 20px;
+		border-radius: 4px;
+		display: none;
+	}
+	.status.success {
+		background: #4CAF50;
+		color: white;
+	}
+	.status.error {
+		background: #f44336;
+		color: white;
+	}
+	h1 {
+		text-align: center;
+		color: #333;
+	}
+</style>
+</head>
+<body>
+
+<h1>Detection Settings</h1>
+
+<div class="setting">
+	<label for="exposure">Auto Exposure Level</label>
+	<div class="description">Camera exposure compensation (-2 to +2). Lower = darker image, better for detecting bright laser flashes.</div>
+	<div class="slider-container">
+		<input type="range" id="exposure" min="-2" max="2" step="1" value="-1">
+		<span class="value-display" id="exposure-val">-1</span>
+	</div>
+</div>
+
+<div class="setting">
+	<label for="brightness">Brightness Threshold</label>
+	<div class="description">Minimum brightness (0-255) to detect a laser hit. Higher = fewer false positives.</div>
+	<div class="slider-container">
+		<input type="range" id="brightness" min="200" max="255" step="1" value="245">
+		<span class="value-display" id="brightness-val">245</span>
+	</div>
+</div>
+
+<div class="setting">
+	<label for="spotsize">Max Spot Size (pixels)</label>
+	<div class="description">Maximum size of bright spot (1-200 pixels). Laser point should be small. Too large = ambient light.</div>
+	<div class="slider-container">
+		<input type="range" id="spotsize" min="1" max="200" step="1" value="20">
+		<span class="value-display" id="spotsize-val">20</span>
+	</div>
+</div>
+
+<div class="setting">
+	<label for="change">Min Brightness Change</label>
+	<div class="description">Minimum brightness increase (0-100) to detect a flash. Higher = only sudden flashes detected.</div>
+	<div class="slider-container">
+		<input type="range" id="change" min="0" max="100" step="1" value="40">
+		<span class="value-display" id="change-val">40</span>
+	</div>
+</div>
+
+<div class="setting">
+	<label for="frames">Min Frames Between Hits</label>
+	<div class="description">Minimum frames between consecutive shots (1-100). Higher = prevents rapid false hits.</div>
+	<div class="slider-container">
+		<input type="range" id="frames" min="1" max="100" step="1" value="5">
+		<span class="value-display" id="frames-val">5</span>
+	</div>
+</div>
+
+<div class="buttons">
+	<button class="btn-save" onclick="saveSettings()">Save Settings</button>
+	<button class="btn-reset" onclick="resetDefaults()">Reset Defaults</button>
+</div>
+
+<div class="buttons">
+	<button class="btn-back" onclick="location.href=&quot;index.html&quot;">&lt; Back to Target</button>
+</div>
+
+<div class="status" id="status"></div>
+
+<script>
+// Update displayed values
+document.querySelectorAll('input[type="range"]').forEach(slider => {
+	const valueDisplay = document.getElementById(slider.id + '-val');
+	slider.addEventListener('input', () => {
+		valueDisplay.textContent = slider.value;
+	});
+});
+
+// Load current settings
+async function loadSettings() {
+	try {
+		const response = await fetch('/get-settings');
+		const settings = await response.json();
+
+		document.getElementById('exposure').value = settings.autoExposureLevel;
+		document.getElementById('exposure-val').textContent = settings.autoExposureLevel;
+
+		document.getElementById('brightness').value = settings.brightnessThreshold;
+		document.getElementById('brightness-val').textContent = settings.brightnessThreshold;
+
+		document.getElementById('spotsize').value = settings.maxSpotSize;
+		document.getElementById('spotsize-val').textContent = settings.maxSpotSize;
+
+		document.getElementById('change').value = settings.minBrightnessChange;
+		document.getElementById('change-val').textContent = settings.minBrightnessChange;
+
+		document.getElementById('frames').value = settings.minFramesBetweenHits;
+		document.getElementById('frames-val').textContent = settings.minFramesBetweenHits;
+	} catch (e) {
+		console.error('Failed to load settings:', e);
+	}
+}
+
+async function saveSettings() {
+	const settings = {
+		autoExposureLevel: parseInt(document.getElementById('exposure').value),
+		brightnessThreshold: parseInt(document.getElementById('brightness').value),
+		maxSpotSize: parseInt(document.getElementById('spotsize').value),
+		minBrightnessChange: parseInt(document.getElementById('change').value),
+		minFramesBetweenHits: parseInt(document.getElementById('frames').value)
+	};
+
+	try {
+		const response = await fetch('/save-settings', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(settings)
+		});
+
+		if (response.ok) {
+			showStatus('Settings saved successfully!', 'success');
+		} else {
+			showStatus('Failed to save settings', 'error');
+		}
+	} catch (e) {
+		showStatus('Error: ' + e.message, 'error');
+	}
+}
+
+function resetDefaults() {
+	document.getElementById('exposure').value = -1;
+	document.getElementById('exposure-val').textContent = -1;
+
+	document.getElementById('brightness').value = 245;
+	document.getElementById('brightness-val').textContent = 245;
+
+	document.getElementById('spotsize').value = 20;
+	document.getElementById('spotsize-val').textContent = 20;
+
+	document.getElementById('change').value = 40;
+	document.getElementById('change-val').textContent = 40;
+
+	document.getElementById('frames').value = 5;
+	document.getElementById('frames-val').textContent = 5;
+
+	showStatus('Default values restored (not saved yet)', 'success');
+}
+
+function showStatus(message, type) {
+	const status = document.getElementById('status');
+	status.textContent = message;
+	status.className = 'status ' + type;
+	status.style.display = 'block';
+
+	setTimeout(() => {
+		status.style.display = 'none';
+	}, 3000);
+}
+
+// Load settings on page load
+loadSettings();
+</script>
+
+</body>
+</html>)RAW_DELIM";
+
 
 const uint8_t soundFile[] = {
 0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6B, 0x54, 0x44, 0x52, 0x43, 0x00, 0x00,
